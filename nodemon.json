@@ -1,0 +1,11 @@
+{
+  "watch": ["api"],
+  "ext": "ts,js,json",
+  "ignore": ["api/**/*.test.ts", "api/**/*.spec.ts", "node_modules"],
+  "exec": "tsx api/server.ts",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000,
+  "verbose": true
+}

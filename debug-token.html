@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Token - Sistema Telemedicina</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .token-display { word-break: break-all; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Token - Sistema Telemedicina</h1>
+        
+        <div class="section info">
+            <h3>📋 Status do LocalStorage</h3>
+            <button onclick="checkLocalStorage()">Verificar LocalStorage</button>
+            <div id="localStorage-result"></div>
+        </div>
+
+        <div class="section info">
+            <h3>🔑 Status do AuthStore (Zustand)</h3>
+            <button onclick="checkZustandStorage()">Verificar Zustand Storage</button>
+            <div id="zustand-result"></div>
+        </div>
+
+        <div class="section info">
+            <h3>🧪 Teste de Login</h3>
+            <input type="email" id="email" placeholder="Email" value="medico@teste.com">
+            <input type="password" id="password" placeholder="Senha" value="123456">
+            <button onclick="testLogin()">Fazer Login</button>
+            <div id="login-result"></div>
+        </div>
+
+        <div class="section info">
+            <h3>📡 Teste API Prescrições</h3>
+            <button onclick="testPrescricoesAPI()">Testar API</button>
+            <div id="api-result"></div>
+        </div>
+
+        <div class="section info">
+            <h3>🧹 Limpeza</h3>
+            <button onclick="clearAllStorage()">Limpar Todo Storage</button>
+            <button onclick="location.reload()">Recarregar Página</button>
+        </div>
+    </div>
+
+    <script>
+        function checkLocalStorage() {
+            const result = document.getElementById('localStorage-result');
+            const items = [];
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                items.push({ key, value });
+            }
+            
+            result.innerHTML = `
+                <h4>Itens no LocalStorage (${items.length}):</h4>
+                <pre>${JSON.stringify(items, null, 2)}</pre>
+            `;
+        }
+
+        function checkZustandStorage() {
+            const result = document.getElementById('zustand-result');
+            const authStorage = localStorage.getItem('auth-storage');
+            
+            if (authStorage) {
+                try {
+                    const parsed = JSON.parse(authStorage);
+                    result.innerHTML = `
+                        <h4>✅ Auth Storage encontrado:</h4>
+                        <pre>${JSON.stringify(parsed, null, 2)}</pre>
+                        <div class="token-display">
+                            <strong>Token:</strong> ${parsed.state?.token || 'Não encontrado'}
+                        </div>
+                    `;
+                } catch (e) {
+                    result.innerHTML = `<h4>❌ Erro ao parsear auth-storage:</h4><pre>${e.message}</pre>`;
+                }
+            } else {
+                result.innerHTML = '<h4>❌ Auth Storage não encontrado</h4>';
+            }
+        }
+
+        async function testLogin() {
+            const result = document.getElementById('login-result');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                result.innerHTML = '<p>🔄 Fazendo login...</p>';
+                
+                const response = await fetch('http://localhost:3002/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password }),
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <h4>✅ Login bem-sucedido:</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                        <div class="token-display">
+                            <strong>Token:</strong> ${data.token}
+                        </div>
+                    `;
+                    
+                    // Simular salvamento no Zustand
+                    const authData = {
+                        state: {
+                            user: data.user,
+                            token: data.token,
+                            isAuthenticated: true
+                        },
+                        version: 0
+                    };
+                    localStorage.setItem('auth-storage', JSON.stringify(authData));
+                    
+                } else {
+                    result.innerHTML = `<h4>❌ Erro no login:</h4><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<h4>❌ Erro na requisição:</h4><pre>${error.message}</pre>`;
+            }
+        }
+
+        async function testPrescricoesAPI() {
+            const result = document.getElementById('api-result');
+            const authStorage = localStorage.getItem('auth-storage');
+            
+            if (!authStorage) {
+                result.innerHTML = '<h4>❌ Token não encontrado. Faça login primeiro.</h4>';
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(authStorage);
+                const token = parsed.state?.token;
+                
+                if (!token) {
+                    result.innerHTML = '<h4>❌ Token não encontrado no storage.</h4>';
+                    return;
+                }
+                
+                result.innerHTML = '<p>🔄 Testando API prescrições...</p>';
+                
+                const response = await fetch('http://localhost:3002/api/prescricoes', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <h4>✅ API prescrições funcionando:</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <h4>❌ Erro na API prescrições (${response.status}):</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `<h4>❌ Erro na requisição:</h4><pre>${error.message}</pre>`;
+            }
+        }
+
+        function clearAllStorage() {
+            localStorage.clear();
+            sessionStorage.clear();
+            alert('✅ Storage limpo! Recarregue a página.');
+        }
+
+        // Verificar automaticamente ao carregar
+        window.onload = function() {
+            checkLocalStorage();
+            checkZustandStorage();
+        };
+    </script>
+</body>
+</html>

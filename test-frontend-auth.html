@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste de Autenticação Frontend</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+        .warning { background-color: #fff3cd; }
+        button { margin: 5px; padding: 10px; }
+        pre { background-color: #f8f9fa; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Teste de Autenticação Frontend</h1>
+    
+    <div class="section">
+        <h2>1. Estado Atual do Auth Storage</h2>
+        <button onclick="checkAuthStorage()">Verificar Auth Storage</button>
+        <div id="authStorageResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. Fazer Login de Teste</h2>
+        <button onclick="testLogin()">Login como Médico</button>
+        <div id="loginResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. Testar API de Prescrições</h2>
+        <button onclick="testPrescricoes()">Testar API Prescrições</button>
+        <div id="prescricoesResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>4. Limpar Storage</h2>
+        <button onclick="clearStorage()">Limpar Auth Storage</button>
+    </div>
+
+    <script>
+        function checkAuthStorage() {
+            const authData = localStorage.getItem('auth-storage');
+            const result = document.getElementById('authStorageResult');
+            
+            if (!authData) {
+                result.innerHTML = '<div class="error"><strong>❌ Não logado:</strong> Nenhum dado de autenticação encontrado</div>';
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(authData);
+                const token = parsed.state?.token;
+                const user = parsed.state?.user;
+                const isAuthenticated = parsed.state?.isAuthenticated;
+                
+                if (token && isAuthenticated) {
+                    result.innerHTML = `
+                        <div class="success">
+                            <strong>✅ Logado:</strong><br>
+                            <strong>Usuário:</strong> ${user?.nome || 'N/A'} (${user?.tipo || 'N/A'})<br>
+                            <strong>Email:</strong> ${user?.email || 'N/A'}<br>
+                            <strong>Token:</strong> ${token.substring(0, 50)}...<br>
+                            <strong>Autenticado:</strong> ${isAuthenticated}
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = '<div class="warning"><strong>⚠️ Dados incompletos:</strong> Token ou status de autenticação ausente</div>';
+                }
+            } catch (e) {
+                result.innerHTML = `<div class="error"><strong>❌ Erro:</strong> ${e.message}</div>`;
+            }
+        }
+        
+        async function testLogin() {
+            const result = document.getElementById('loginResult');
+            result.innerHTML = '<div>🔄 Fazendo login...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:3002/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'medico@teste.com',
+                        password: '123456'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Simular o que o authStore faria
+                    const authData = {
+                        state: {
+                            user: data.user,
+                            token: data.token,
+                            isAuthenticated: true
+                        },
+                        version: 0
+                    };
+                    
+                    localStorage.setItem('auth-storage', JSON.stringify(authData));
+                    
+                    result.innerHTML = `
+                        <div class="success">
+                            <strong>✅ Login realizado com sucesso!</strong><br>
+                            <strong>Token:</strong> ${data.token.substring(0, 50)}...
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = `<div class="error"><strong>❌ Erro no login:</strong> ${data.message}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error"><strong>❌ Erro:</strong> ${error.message}</div>`;
+            }
+        }
+        
+        async function testPrescricoes() {
+            const result = document.getElementById('prescricoesResult');
+            result.innerHTML = '<div>🔄 Testando API...</div>';
+            
+            const authData = localStorage.getItem('auth-storage');
+            if (!authData) {
+                result.innerHTML = '<div class="error"><strong>❌ Erro:</strong> Faça login primeiro</div>';
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(authData);
+                const token = parsed.state?.token;
+                
+                if (!token) {
+                    result.innerHTML = '<div class="error"><strong>❌ Erro:</strong> Token não encontrado</div>';
+                    return;
+                }
+                
+                const response = await fetch('http://localhost:3002/api/prescricoes', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">
+                            <strong>✅ API funcionando!</strong><br>
+                            <strong>Status:</strong> ${response.status}<br>
+                            <strong>Prescrições encontradas:</strong> ${data.prescricoes?.length || 0}<br>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = `
+                        <div class="error">
+                            <strong>❌ Erro na API:</strong><br>
+                            <strong>Status:</strong> ${response.status}<br>
+                            <strong>Mensagem:</strong> ${data.message || 'Erro desconhecido'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error"><strong>❌ Erro:</strong> ${error.message}</div>`;
+            }
+        }
+        
+        function clearStorage() {
+            localStorage.removeItem('auth-storage');
+            alert('Auth storage limpo!');
+            checkAuthStorage();
+        }
+        
+        // Verificar automaticamente ao carregar
+        window.onload = function() {
+            checkAuthStorage();
+        };
+    </script>
+</body>
+</html>
